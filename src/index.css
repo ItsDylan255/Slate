@@ -1,0 +1,288 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@plugin "@tailwindcss/typography";
+
+/* Dunkelmodus wird über die Klasse "dark" auf <html> geschaltet (siehe App.tsx) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design-Werte nach dem Vorbild von Kaneo (MIT-Lizenz, github.com/usekaneo/kaneo):
+ * neutrale Grautöne, Schrift Geist, dezente Rahmen und Karten.
+ */
+:root {
+  --radius: 0.625rem;
+  --background: #ffffff;
+  --foreground: #262626;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --primary: #262626;
+  --primary-foreground: #fafafa;
+  --muted: rgb(0 0 0 / 4%);
+  --muted-foreground: #686868;
+  --accent: rgb(0 0 0 / 4%);
+  --border: rgb(0 0 0 / 8%);
+  --input: rgb(0 0 0 / 10%);
+  --ring: #a3a3a3;
+  --destructive: #ef4444;
+  --destructive-foreground: #b91c1c;
+  --info: #1d4ed8;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --sidebar: #fafafa;
+  --sidebar-foreground: #727272;
+  --sidebar-accent: rgb(0 0 0 / 4%);
+  --sidebar-border: rgb(0 0 0 / 6%);
+
+  --board-lane: #00000005;
+  --board-card: #ffffff;
+  --board-card-border: #00000014;
+  --board-card-border-hover: #0000002e;
+  --board-card-selected: #f2f2f2;
+  --board-card-selected-border: #00000038;
+  --board-card-ring: #8a8a8a40;
+  --board-card-shadow: 0 1px 2px #0000000a;
+  --board-card-done: #ffffff99;
+  --board-card-done-border: #0000000f;
+  --board-id: #8a8a8a;
+  --board-id-done: #a3a3a3;
+  --board-title: #171717;
+  --board-title-done: #737373;
+  --chip-border: #00000017;
+  --chip-border-hover: #00000029;
+  --chip-hover: #0000000a;
+  --chip-foreground: #404040;
+  --chip-muted: #737373;
+  --chip-icon: #8a8a8a;
+  --priority-bar: #525252;
+  --priority-bar-empty: #00000021;
+  --priority-low: #2563eb;
+  --priority-medium: #d97706;
+  --priority-high: #ea580c;
+  --priority-urgent: #dc2626;
+  --due-overdue: #dc2626;
+}
+
+.dark {
+  --background: #141414;
+  --foreground: #f5f5f5;
+  --card: #191919;
+  --popover: #191919;
+  --primary: #f5f5f5;
+  --primary-foreground: #262626;
+  --muted: rgb(255 255 255 / 4%);
+  --muted-foreground: #818181;
+  --accent: rgb(255 255 255 / 4%);
+  --border: rgb(255 255 255 / 6%);
+  --input: rgb(255 255 255 / 8%);
+  --ring: #737373;
+  --destructive: #f05656;
+  --destructive-foreground: #f87171;
+  --info: #60a5fa;
+  --sidebar: #111111;
+  --sidebar-foreground: #a3a3a3;
+  --sidebar-accent: rgb(255 255 255 / 4%);
+  --sidebar-border: rgb(255 255 255 / 5%);
+
+  --board-lane: #0000001f;
+  --board-card: #1c1c1c;
+  --board-card-border: transparent;
+  --board-card-border-hover: #ffffff2e;
+  --board-card-selected: #262626;
+  --board-card-selected-border: #ffffff3d;
+  --board-card-ring: #a3a3a333;
+  --board-card-shadow: 0 1px 2px #00000033, 0 4px 12px -4px #00000059;
+  --board-card-done: #ffffff03;
+  --board-card-done-border: #ffffff0a;
+  --board-id: #707070;
+  --board-id-done: #5c5c5c;
+  --board-title: #ededed;
+  --board-title-done: #707070;
+  --chip-border: #ffffff17;
+  --chip-border-hover: #ffffff29;
+  --chip-hover: #ffffff0a;
+  --chip-foreground: #cfcfcf;
+  --chip-muted: #8f8f8f;
+  --chip-icon: #8a8a8a;
+  --priority-bar: #a3a3a3;
+  --priority-bar-empty: #ffffff24;
+  --priority-low: #60a5fa;
+  --priority-medium: #fbbf24;
+  --priority-high: #fb923c;
+  --priority-urgent: #e5484d;
+  --due-overdue: #ff6467;
+}
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, Consolas, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-popover: var(--popover);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-info: var(--info);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-board-lane: var(--board-lane);
+  --color-board-card: var(--board-card);
+  --color-board-card-border: var(--board-card-border);
+  --color-board-card-border-hover: var(--board-card-border-hover);
+  --color-board-card-selected: var(--board-card-selected);
+  --color-board-card-selected-border: var(--board-card-selected-border);
+  --color-board-card-ring: var(--board-card-ring);
+  --color-board-card-done: var(--board-card-done);
+  --color-board-card-done-border: var(--board-card-done-border);
+  --color-board-id: var(--board-id);
+  --color-board-id-done: var(--board-id-done);
+  --color-board-title: var(--board-title);
+  --color-board-title-done: var(--board-title-done);
+  --color-chip-border: var(--chip-border);
+  --color-chip-border-hover: var(--chip-border-hover);
+  --color-chip-hover: var(--chip-hover);
+  --color-chip-foreground: var(--chip-foreground);
+  --color-chip-muted: var(--chip-muted);
+  --color-chip-icon: var(--chip-icon);
+  --color-priority-bar: var(--priority-bar);
+  --color-priority-bar-empty: var(--priority-bar-empty);
+  --color-priority-low: var(--priority-low);
+  --color-priority-medium: var(--priority-medium);
+  --color-priority-high: var(--priority-high);
+  --color-priority-urgent: var(--priority-urgent);
+  --color-due-overdue: var(--due-overdue);
+  --shadow-board-card: var(--board-card-shadow);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-sidebar font-sans text-foreground antialiased;
+    font-size: 14px;
+    user-select: none;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-semibold tracking-tight;
+  }
+  input,
+  textarea,
+  .selectable {
+    user-select: text;
+  }
+  /* Checkboxen wie bei Kaneo: kleines abgerundetes Quadrat, gefüllt wenn aktiv */
+  input[type="checkbox"] {
+    appearance: none;
+    display: inline-grid;
+    place-content: center;
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    cursor: pointer;
+    border: 1px solid var(--input);
+    border-radius: 4px;
+    background: var(--background);
+    box-shadow: 0 1px 1px rgb(0 0 0 / 4%);
+    vertical-align: middle;
+  }
+  input[type="checkbox"]:checked {
+    border-color: var(--primary);
+    background: var(--primary)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8.2 2.6 2.6L12 5.4' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / 12px no-repeat;
+  }
+  .dark input[type="checkbox"]:checked {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8.2 2.6 2.6L12 5.4' fill='none' stroke='%23262626' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+}
+
+/* Wiederverwendbare Bausteine (Knöpfe, Eingabefelder, Chips) im Kaneo-Stil */
+@utility btn {
+  @apply relative inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-transparent px-2.75 text-sm font-medium whitespace-nowrap transition-[background-color,box-shadow,scale] duration-150 ease-out outline-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-60 [&_svg]:shrink-0 [&_svg]:opacity-80;
+}
+@utility btn-primary {
+  @apply btn border-primary bg-primary text-primary-foreground shadow-xs hover:bg-primary/90;
+}
+@utility btn-outline {
+  @apply btn border-input bg-popover text-foreground shadow-xs/5 hover:bg-accent;
+}
+@utility btn-ghost {
+  @apply btn text-foreground hover:bg-accent;
+}
+@utility btn-danger {
+  @apply btn text-destructive-foreground hover:bg-destructive/8;
+}
+@utility btn-icon {
+  @apply inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-chip-icon transition-colors hover:bg-chip-hover hover:text-board-title;
+}
+@utility input {
+  @apply h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm text-foreground shadow-xs/5 outline-none placeholder:text-muted-foreground/70 focus:border-ring focus:ring-[3px] focus:ring-ring/20 dark:bg-white/[0.03];
+}
+/* Eingabe ohne Rahmen, die erst beim Überfahren sichtbar wird (Eigenschaften-Spalte wie bei Kaneo) */
+@utility input-ghost {
+  @apply h-7 w-full cursor-pointer rounded-md border border-transparent bg-transparent px-2 text-[13px] text-foreground outline-none hover:bg-accent focus:border-ring focus:bg-background focus:ring-[3px] focus:ring-ring/20 [color-scheme:light] dark:[color-scheme:dark];
+}
+/* Abschnittsüberschrift im Aufgaben-Dialog (Beschreibung, Unteraufgaben, …) */
+@utility section-title {
+  @apply text-[15px] font-semibold tracking-tight text-foreground;
+}
+@utility label {
+  @apply mb-1.5 block text-xs font-medium text-muted-foreground;
+}
+@utility chip {
+  @apply inline-flex h-5.5 min-w-0 shrink-0 items-center gap-1.25 rounded-md border border-chip-border px-1.5 text-xs text-chip-foreground [&_svg]:size-3 [&_svg]:shrink-0;
+}
+@utility segmented {
+  @apply flex h-7 shrink-0 items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 dark:bg-white/[0.03];
+}
+@utility segmented-item {
+  @apply inline-flex h-6 cursor-pointer items-center gap-1.5 rounded-[7px] px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3.5;
+}
+@utility segmented-item-active {
+  @apply segmented-item bg-accent text-foreground shadow-xs/5;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+/* Beim Ziehen überall die "greifende Hand" zeigen */
+body:has([aria-pressed="true"][aria-roledescription="sortable"]),
+body:has([aria-pressed="true"][aria-roledescription="sortable"]) * {
+  cursor: grabbing !important;
+}
+
+textarea.input {
+  @apply h-auto py-2;
+}
