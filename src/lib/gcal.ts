@@ -18,6 +18,8 @@ export interface GcalStatus {
   state: "off" | "idle" | "syncing" | "error";
   last?: number;
   error?: string;
+  /** Anzahl Aufgaben, die gerade als Termin im Kalender stehen */
+  count?: number;
 }
 
 let access: { token: string; expires: number } | null = null;
@@ -153,11 +155,22 @@ const fail = (what: string, r: { status: number; data: unknown }) =>
 
 // ---------- Kalender ----------
 
+/** Kalender in Google Kalender sichtbar schalten (neu angelegte Kalender sind sonst evtl. ausgeblendet). */
+let visibilityChecked = false;
+async function makeVisible(id: string) {
+  if (visibilityChecked) return;
+  const r = await api("PATCH", `/users/me/calendarList/${encodeURIComponent(id)}`, { selected: true, hidden: false });
+  if (r.status === 200) visibilityChecked = true;
+}
+
 async function ensureCalendar(): Promise<string> {
   const cached = await db.getSetting("gcal_calendar_id");
   if (cached) {
     const r = await api("GET", `/calendars/${encodeURIComponent(cached)}`);
-    if (r.status === 200) return cached;
+    if (r.status === 200) {
+      await makeVisible(cached);
+      return cached;
+    }
   }
   // Vorhandenen "Slate"-Kalender suchen (z. B. vom anderen PC angelegt)
   const list = await api<{ items?: { id: string; summary: string }[] }>("GET", "/users/me/calendarList?minAccessRole=owner&maxResults=250");
@@ -173,6 +186,7 @@ async function ensureCalendar(): Promise<string> {
     id = created.data.id;
   }
   await db.setSetting("gcal_calendar_id", id);
+  await makeVisible(id);
   return id;
 }
 
@@ -276,7 +290,7 @@ export async function syncCalendar() {
       const res = await api("DELETE", `${path}/${id}`);
       if (res.status >= 300 && res.status !== 404 && res.status !== 410) throw fail("Termin löschen", res);
     }
-    setStatus({ state: "idle", last: Date.now() });
+    setStatus({ state: "idle", last: Date.now(), count: desired.size });
   } catch (e) {
     setStatus({ state: "error", error: e instanceof Error ? e.message : String(e), last: status.last });
   } finally {

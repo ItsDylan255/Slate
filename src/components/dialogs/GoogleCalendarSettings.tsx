@@ -69,7 +69,7 @@ export function GoogleCalendarSettings() {
               : status.state === "error"
                 ? `${t("sync.error")}: ${status.error}`
                 : status.last
-                  ? t("sync.last", { time: formatDateTime(status.last, lang) })
+                  ? `${t("sync.last", { time: formatDateTime(status.last, lang) })} · ${t("gcal.count", { n: status.count ?? 0 })}`
                   : ""}
           </p>
           <div className="flex gap-2">

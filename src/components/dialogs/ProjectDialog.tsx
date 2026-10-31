@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Archive, Check, Plus, Trash2 } from "lucide-react";
+import { Archive, Plus, Trash2 } from "lucide-react";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useStore } from "../../store";
 import type { FieldType } from "../../lib/types";
@@ -30,7 +30,8 @@ export function ProjectDialog() {
   const [key, setKey] = useState(project?.key ?? "");
   const [keyTouched, setKeyTouched] = useState(!!project);
   const icon = project?.icon ?? "";
-  const [color, setColor] = useState(project?.color ?? COLORS[0]);
+  // Farbauswahl gibt es nicht mehr – neue Projekte bekommen Grau, bestehende behalten ihre Farbe
+  const color = project?.color ?? COLORS[0];
   const [description, setDescription] = useState(project?.description ?? "");
 
   const close = () => set({ projectDialog: null });
@@ -103,25 +104,8 @@ export function ProjectDialog() {
           </div>
           <div>
             <label className="label">{t("project.description")}</label>
-            <textarea className="input resize-none" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+            <textarea className="input resize-none" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
-          <div>
-            <label className="label">{t("project.color")}</label>
-            <div className="flex gap-2">
-              {COLORS.map((c) => (
-                <button
-                  type="button"
-                  key={c}
-                  onClick={() => setColor(c)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-white transition hover:scale-110"
-                  style={{ backgroundColor: c, boxShadow: color === c ? `0 0 0 2px var(--popover), 0 0 0 4px ${c}` : undefined }}
-                >
-                  {color === c && <Check size={14} />}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="flex items-center justify-between border-t border-border pt-4 ">
             {project ? (
               <div className="flex gap-1">

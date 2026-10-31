@@ -7,6 +7,7 @@ import { Archive, ChevronRight, CircleCheck, House, Layout, MoreHorizontal, Pane
 import { isDone, useStore } from "../store";
 import type { Project } from "../lib/types";
 import { useT } from "../i18n";
+import { SlateLogo } from "./SlateLogo";
 
 /** Knopf zum Ein-/Ausklappen der Seitenleiste (Strg+B), wie Kaneos Sidebar-Trigger. */
 export function SidebarTrigger() {
@@ -58,13 +59,7 @@ export function Sidebar() {
       {/* App-Kopf mit Such-Symbol (bei Kaneo: Workspace-Umschalter) */}
       <div className="flex items-center gap-1 px-2 pt-2 pb-1.5">
         <div className="flex h-10 min-w-0 flex-1 items-center gap-2.5 px-2">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden="true">
-              <rect x="3" y="5" width="4" height="15" rx="1.2" />
-              <rect x="9" y="3" width="4" height="17" rx="1.2" />
-              <rect x="15" y="7" width="6" height="13" rx="1.2" />
-            </svg>
-          </div>
+          <SlateLogo className="size-7" />
           <span className="truncate text-sm font-semibold text-foreground">{t("app.name")}</span>
         </div>
         <button

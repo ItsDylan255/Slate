@@ -300,6 +300,7 @@ export const de = {
   "gcal.howTitle": "Aufgaben im Google Kalender",
   "gcal.howText": "Slate legt in deinem Google-Konto einen eigenen Kalender „Slate“ an und trägt dort alle Aufgaben mit Datum als ganztägige Termine ein. Änderungen an Aufgaben werden nach wenigen Sekunden übernommen, gelöschte oder archivierte Aufgaben verschwinden. Deine anderen Kalender werden nicht angefasst.",
   "gcal.connected": "Mit Google Kalender verbunden",
+  "gcal.count": "{n} Aufgaben mit Datum im Kalender",
   "gcal.open": "Google Kalender öffnen",
   "gcal.disconnect": "Trennen",
   "gcal.clientId": "Client-ID",

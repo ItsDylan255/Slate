@@ -1,6 +1,6 @@
 [package]
 name = "slate"
-version = "0.1.0"
+version = "1.0.0"
 description = "Slate – schlanker Projektmanager"
 authors = ["ItsDylan255"]
 edition = "2024"

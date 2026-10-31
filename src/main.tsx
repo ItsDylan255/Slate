@@ -10,6 +10,9 @@ async function start() {
     await installMock();
     const { useStore } = await import("./store");
     (window as never as { __store: typeof useStore }).__store = useStore;
+    // Beispieldaten für Screenshots (?demo)
+    const params = new URLSearchParams(location.search);
+    if (params.has("demo")) import("./dev/demo").then((m) => m.runDemo(params));
   }
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>

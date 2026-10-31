@@ -302,6 +302,7 @@ export const en: Record<keyof typeof de, string> = {
   "gcal.howTitle": "Tasks in Google Calendar",
   "gcal.howText": "Slate creates its own calendar “Slate” in your Google account and adds every task with a date as an all-day event. Changes show up within seconds; deleted or archived tasks disappear. Your other calendars are not touched.",
   "gcal.connected": "Connected to Google Calendar",
+  "gcal.count": "{n} dated tasks in the calendar",
   "gcal.open": "Open Google Calendar",
   "gcal.disconnect": "Disconnect",
   "gcal.clientId": "Client ID",
