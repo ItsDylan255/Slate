@@ -11,7 +11,9 @@ import { isDone, taskKey, useStore } from "../store";
 import { addDays, format, parseISO } from "date-fns";
 
 const API = "https://www.googleapis.com/calendar/v3";
-const SCOPE = "https://www.googleapis.com/auth/calendar";
+// Kalender + Aufgaben (Google Tasks für Unteraufgaben)
+const TASKS_SCOPE = "https://www.googleapis.com/auth/tasks";
+const SCOPE = `https://www.googleapis.com/auth/calendar ${TASKS_SCOPE}`;
 const CALENDAR_NAME = "Slate";
 
 export interface GcalStatus {
@@ -60,7 +62,9 @@ async function tokenRequest(params: Record<string, string>) {
   const [code, text] = await native.httpRequest("POST", "https://oauth2.googleapis.com/token", [["Content-Type", "application/x-www-form-urlencoded"]], body);
   const json = JSON.parse(text || "{}");
   if (code !== 200) throw new Error(json.error_description || json.error || `Google: ${code}`);
-  return json as { access_token: string; expires_in: number; refresh_token?: string };
+  // Merken, welche Rechte Google erteilt hat (alte Verbindungen haben noch kein Google Tasks)
+  if (json.scope) await db.setSetting("gcal_scope", json.scope);
+  return json as { access_token: string; expires_in: number; refresh_token?: string; scope?: string };
 }
 
 /** Öffnet die Google-Anmeldung im Browser und speichert das Token. */
@@ -97,6 +101,12 @@ export async function connectGoogle(clientId: string, clientSecret: string) {
   await db.setSetting("gcal_refresh_token", tok.refresh_token);
   access = { token: tok.access_token, expires: Date.now() + (tok.expires_in - 60) * 1000 };
   await syncCalendar();
+  window.dispatchEvent(new Event("slate:google-connected"));
+}
+
+/** Darf Slate auf Google Tasks zugreifen? (Verbindungen von vor Version 1.0.2 nicht) */
+export async function hasTasksScope() {
+  return ((await db.getSetting("gcal_scope")) ?? "").includes(TASKS_SCOPE);
 }
 
 export async function disconnectGoogle() {
@@ -132,11 +142,14 @@ async function accessToken() {
   }
 }
 
-async function api<T = unknown>(method: string, path: string, body?: unknown, retry = true): Promise<{ status: number; data: T }> {
+const api = <T = unknown>(method: string, path: string, body?: unknown) => googleRequest<T>(method, API + path, body);
+
+/** Angemeldete Anfrage an eine Google-API (Kalender, Tasks). */
+export async function googleRequest<T = unknown>(method: string, url: string, body?: unknown, retry = true): Promise<{ status: number; data: T }> {
   const token = await accessToken();
   const [code, text] = await native.httpRequest(
     method,
-    API + path,
+    url,
     [
       ["Authorization", `Bearer ${token}`],
       ["Content-Type", "application/json"],
@@ -145,12 +158,12 @@ async function api<T = unknown>(method: string, path: string, body?: unknown, re
   );
   if (code === 401 && retry) {
     access = null;
-    return api(method, path, body, false);
+    return googleRequest(method, url, body, false);
   }
   return { status: code, data: (text ? JSON.parse(text) : {}) as T };
 }
 
-const fail = (what: string, r: { status: number; data: unknown }) =>
+export const fail = (what: string, r: { status: number; data: unknown }) =>
   new Error(`${what}: ${r.status} ${(r.data as { error?: { message?: string } })?.error?.message ?? ""}`);
 
 // ---------- Kalender ----------

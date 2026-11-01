@@ -22,7 +22,9 @@ export function applyFilters(tasks: Task[], f: Filters, data: Data): Task[] {
     }
     if (f.priorities.length && !f.priorities.includes(t.priority)) return false;
     if (f.labels.length) {
-      const own = data.task_labels.filter((tl) => tl.task_id === t.id).map((tl) => tl.label_id);
+      const own = data.task_labels
+        .filter((tl) => tl.task_id === t.id)
+        .map((tl) => data.labels.find((l) => l.id === tl.label_id)?.name.toLowerCase());
       if (!f.labels.some((l) => own.includes(l))) return false;
     }
     if (f.due !== "all") {

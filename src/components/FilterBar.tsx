@@ -18,7 +18,16 @@ const DUE_OPTIONS: { value: DueFilter; label: TKey }[] = [
 export function FilterBar() {
   const t = useT();
   const f = useStore((s) => s.filters);
-  const labels = useStore((s) => s.data.labels);
+  const allLabels = useStore((s) => s.data.labels);
+  const view = useStore((s) => s.view);
+  // Im Projekt nur dessen Labels, sonst alle (gleiche Namen zusammengefasst)
+  const labels = [
+    ...new Map(
+      allLabels
+        .filter((l) => view.kind !== "project" || l.project_id === view.projectId)
+        .map((l) => [l.name.toLowerCase(), l] as const),
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name));
   const set = useStore((s) => s.set);
   const update = (patch: Partial<typeof f>) => set({ filters: { ...f, ...patch } });
   const prio = usePopover();
@@ -90,8 +99,8 @@ export function FilterBar() {
             <MenuItem
               key={l.id}
               icon={<span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: l.color }} />}
-              right={f.labels.includes(l.id) && <Check size={13} />}
-              onClick={() => update({ labels: toggle(f.labels, l.id) })}
+              right={f.labels.includes(l.name.toLowerCase()) && <Check size={13} />}
+              onClick={() => update({ labels: toggle(f.labels, l.name.toLowerCase()) })}
             >
               {l.name}
             </MenuItem>

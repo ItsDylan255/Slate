@@ -23,15 +23,18 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { isDone, useStore } from "../store";
-import type { Task } from "../lib/types";
+import type { Subtask, Task } from "../lib/types";
 import { isoDate, locale } from "../lib/dates";
 import { priorityInfo } from "../lib/priority";
 import { useTaskClick } from "../components/task/useTaskClick";
 import { useT } from "../i18n";
 
-/** Monatskalender: Aufgaben am Fälligkeitstag. Aufgaben lassen sich auf andere Tage ziehen. */
+/**
+ * Monatskalender: Aufgaben am Fälligkeitstag, dazu Unteraufgaben mit Datum (gestrichelt, mit Kreis zum Abhaken).
+ * Beides lässt sich auf andere Tage ziehen.
+ */
 export function CalendarView({ projectId, tasks }: { projectId?: string; tasks: Task[] }) {
   const t = useT();
   const lang = useStore((s) => s.lang);
@@ -45,6 +48,9 @@ export function CalendarView({ projectId, tasks }: { projectId?: string; tasks: 
     end: endOfWeek(endOfMonth(month), weekOpts),
   });
   const dated = tasks.filter((x) => x.due_date && !x.archived);
+  const allSubtasks = useStore((s) => s.data.subtasks);
+  const visibleTasks = new Set(tasks.filter((x) => !x.archived).map((x) => x.id));
+  const datedSubs = allSubtasks.filter((s) => s.due_date && visibleTasks.has(s.task_id));
   const click = useTaskClick(dated.map((x) => x.id));
   const weekdays = days.slice(0, 7).map((d) => format(d, "EEEEEE", { locale: locale(lang) }));
 
@@ -52,6 +58,12 @@ export function CalendarView({ projectId, tasks }: { projectId?: string; tasks: 
     setActiveId(null);
     if (!over) return;
     const day = String(over.id);
+    const subId = String(active.id).startsWith("sub:") ? String(active.id).slice(4) : null;
+    if (subId) {
+      const sub = datedSubs.find((s) => s.id === subId);
+      if (sub && sub.due_date !== day) useStore.getState().patch("subtasks", sub.id, { due_date: day });
+      return;
+    }
     const task = tasks.find((x) => x.id === active.id);
     if (!task || !task.due_date || task.due_date === day) return;
     // Startdatum mitverschieben, damit die Dauer gleich bleibt
@@ -61,6 +73,7 @@ export function CalendarView({ projectId, tasks }: { projectId?: string; tasks: 
   };
 
   const activeTask = dated.find((x) => x.id === activeId);
+  const activeSub = datedSubs.find((s) => `sub:${s.id}` === activeId);
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -100,11 +113,16 @@ export function CalendarView({ projectId, tasks }: { projectId?: string; tasks: 
                       onContextMenu={(e) => click.onContextMenu(e, x.id)}
                     />
                   ))}
+                {datedSubs
+                  .filter((s) => s.due_date === iso)
+                  .map((s) => (
+                    <SubtaskItem key={s.id} subtask={s} />
+                  ))}
               </Day>
             );
           })}
         </div>
-        <DragOverlay>{activeTask && <ItemView task={activeTask} />}</DragOverlay>
+        <DragOverlay>{activeTask ? <ItemView task={activeTask} /> : activeSub ? <SubtaskView subtask={activeSub} /> : null}</DragOverlay>
       </DndContext>
     </div>
   );
@@ -157,6 +175,50 @@ function ItemView({ task }: { task: Task }) {
     >
       {task.priority !== "none" && <span className={priorityInfo(task.priority).className}>● </span>}
       {task.title}
+    </div>
+  );
+}
+
+function SubtaskItem({ subtask }: { subtask: Subtask }) {
+  const { setNodeRef, attributes, listeners, isDragging } = useDraggable({ id: `sub:${subtask.id}` });
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={() => useStore.getState().set({ openTaskId: subtask.task_id })}
+      className={isDragging ? "opacity-40" : ""}
+    >
+      <SubtaskView subtask={subtask} />
+    </div>
+  );
+}
+
+/** Unteraufgabe im Kalender: gestrichelter Rahmen statt Karte, runder Haken, Aufgabe darunter klein */
+function SubtaskView({ subtask }: { subtask: Subtask }) {
+  const parent = useStore((s) => s.data.tasks.find((x) => x.id === subtask.task_id));
+  const done = !!subtask.done;
+  return (
+    <div
+      className="flex cursor-pointer items-start gap-1.5 rounded border border-dashed border-border px-1.5 py-0.5 text-xs hover:bg-accent"
+      title={`${subtask.title} – ${parent?.title ?? ""}`}
+    >
+      <button
+        className={`mt-px flex size-3 shrink-0 cursor-pointer items-center justify-center rounded-full border ${
+          done ? "border-muted-foreground bg-muted-foreground text-background" : "border-muted-foreground/60 hover:border-foreground"
+        }`}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          useStore.getState().patch("subtasks", subtask.id, { done: done ? 0 : 1 });
+        }}
+      >
+        {done && <Check className="size-2" strokeWidth={4} />}
+      </button>
+      <div className="min-w-0 flex-1">
+        <div className={`truncate ${done ? "text-muted-foreground/70 line-through" : "text-muted-foreground"}`}>{subtask.title}</div>
+        <div className="truncate text-[10px] text-muted-foreground/60">↳ {parent?.title}</div>
+      </div>
     </div>
   );
 }

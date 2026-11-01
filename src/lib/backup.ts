@@ -38,6 +38,22 @@ export async function backupTimes(): Promise<Record<SlotKey, number | null>> {
   return out;
 }
 
+/** Inhalt eines Backups zum Ansehen (alte Version) */
+export async function readBackup(key: SlotKey) {
+  const json = JSON.parse(await native.readTextFile(await slotPath(key))) as { exportedAt: number; tables: Partial<Data> };
+  return { at: json.exportedAt, tables: json.tables };
+}
+
+/** Beliebige Sicherungsdatei (automatisch oder manuell exportiert) zum Ansehen öffnen */
+export async function pickBackupFile() {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const path = await open({ multiple: false, defaultPath: await backupDir(), filters: [{ name: "JSON", extensions: ["json"] }] });
+  if (!path || Array.isArray(path)) return null;
+  const json = JSON.parse(await native.readTextFile(path));
+  if (json.app !== "projekt-manager" || !json.tables) throw new Error("backup.invalid");
+  return { at: Number(json.exportedAt) || Date.now(), tables: json.tables as Partial<Data> };
+}
+
 /** Schreibt alle Fächer neu, deren Stand zu alt ist. */
 export async function runBackups() {
   const raw = useStore.getState().raw;

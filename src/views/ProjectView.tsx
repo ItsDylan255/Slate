@@ -48,7 +48,7 @@ export function ProjectView({ projectId, tab }: { projectId: string; tab: Tab })
           >
             <span className="truncate">{project.name}</span>
           </button>
-        </nav>
+</nav>
 
         <nav className="segmented">
           {PROJECT_TABS.map(({ tab: id, label, icon: Icon }, i) => (

@@ -28,9 +28,19 @@ export function Sidebar() {
   const view = useStore((s) => s.view);
   const allProjects = useStore((s) => s.data.projects);
   const projects = allProjects.filter((p) => !p.archived);
+  const favorites = projects.filter((p) => p.favorite);
   const openCount = useStore((s) => s.data.tasks.filter((x) => !x.archived && !isDone(x, s.data.columns)).length);
   const { go, set, reorderProjects } = useStore.getState();
   const [projectsOpen, setProjectsOpen] = useState(true);
+  const [favoritesOpen, setFavoritesOpen] = useState(() => localStorage.getItem("slate.favoritesOpen") !== "0");
+  const toggleFavorites = (open: boolean) => {
+    setFavoritesOpen(open);
+    try {
+      localStorage.setItem("slate.favoritesOpen", open ? "1" : "0");
+    } catch {
+      /* egal */
+    }
+  };
   const update = useUpdate();
   const [dragging, setDragging] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -79,6 +89,29 @@ export function Sidebar() {
         <NavItem active={view.kind === "my"} icon={<CircleCheck />} label={t("nav.myTasks")} onClick={() => go({ kind: "my" })} count={openCount} />
         <NavItem active={view.kind === "archive"} icon={<Archive />} label={t("nav.archive")} onClick={() => go({ kind: "archive" })} />
       </nav>
+
+      {favorites.length > 0 && (
+        <div className="px-2 pb-1">
+          <button
+            onClick={() => toggleFavorites(!favoritesOpen)}
+            className="flex h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-xs font-medium text-foreground"
+          >
+            <span>{t("nav.favorites")}</span>
+            <ChevronRight className={`size-3.5 text-sidebar-foreground/60 transition-transform duration-200 ${favoritesOpen ? "rotate-90" : ""}`} />
+          </button>
+          <div className={`space-y-0.5 ${favoritesOpen ? "" : "hidden"}`}>
+            {favorites.map((p) => (
+              <NavItem
+                key={p.id}
+                active={view.kind === "project" && view.projectId === p.id}
+                icon={<Layout />}
+                label={p.name}
+                onClick={() => go({ kind: "project", projectId: p.id, tab: view.kind === "project" ? view.tab : "board" })}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="relative flex min-h-0 flex-1 flex-col p-2 pt-1">
         <button

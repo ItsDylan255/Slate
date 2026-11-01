@@ -9,6 +9,7 @@ import type {
   Data,
   Field,
   FieldType,
+  Label,
   Priority,
   Project,
   RelationKind,
@@ -16,9 +17,11 @@ import type {
   TableName,
   Tables,
   Task,
+  TaskLabel,
 } from "./lib/types";
 import { TABLES } from "./lib/types";
 import { parseRecurrence, shiftDate } from "./lib/dates";
+import { COLORS } from "./lib/priority";
 import type { Lang } from "./i18n";
 
 export type ProjectView = "board" | "list" | "backlog" | "calendar" | "gantt";
@@ -84,6 +87,9 @@ interface State {
   settingsOpen: boolean;
   shortcutsOpen: boolean;
   projectDialog: { projectId?: string } | null;
+  importDialog: { projectId?: string } | null;
+  /** Alte Version (Backup) ansehen */
+  backupView: { at: number; tables: Partial<Data> } | null;
   newTaskFor: { projectId?: string; columnId?: string | null; due?: string } | null;
   menu: { x: number; y: number; taskId: string } | null;
   /** Gerade neu angelegte Aufgabe, die noch im Fenster bearbeitet wird (ohne Titel = wird verworfen) */
@@ -130,8 +136,11 @@ interface State {
 
   // Details
   toggleLabel: (taskId: string, labelId: string, on?: boolean) => Promise<void>;
-  createLabel: (name: string, color: string) => Promise<string>;
-  addSubtask: (taskId: string, title: string) => Promise<void>;
+  createLabel: (projectId: string, name: string, color: string) => Promise<string>;
+  /** Label mit diesem Namen im Projekt der Aufgabe an-/abhaken (legt es bei Bedarf an) */
+  toggleLabelByName: (taskId: string, name: string, on: boolean, color?: string) => Promise<void>;
+  addSubtask: (taskId: string, title: string, dueDate?: string | null) => Promise<void>;
+  reorderSubtasks: (ids: string[]) => Promise<void>;
   addComment: (taskId: string, body: string) => Promise<void>;
   addLink: (taskId: string, url: string, title: string) => Promise<void>;
   addRelation: (taskId: string, otherId: string, kind: RelationKind) => Promise<void>;
@@ -204,6 +213,35 @@ export const useStore = create<State>((set, get) => {
     return write(table, rows);
   };
 
+  /**
+   * Labels waren früher für alle Projekte gemeinsam. Jetzt gehört jedes Label zu einem Projekt:
+   * ein altes Label wird in jedes Projekt kopiert, in dem es benutzt wird (unbenutzte in alle Projekte).
+   * Die neuen IDs sind fest (Label-ID + Projekt-ID), damit mehrere PCs zum gleichen Ergebnis kommen.
+   */
+  const migrateGlobalLabels = async () => {
+    const d = get().data;
+    const old = d.labels.filter((l) => !l.project_id);
+    if (!old.length) return;
+    const projectOf = new Map(d.tasks.map((t) => [t.id, t.project_id]));
+    const newLabels: Label[] = [];
+    const links: TaskLabel[] = [];
+    for (const l of old) {
+      const used = d.task_labels.filter((tl) => tl.label_id === l.id);
+      const projects = new Set(used.map((tl) => projectOf.get(tl.task_id)).filter((x): x is string => !!x));
+      if (!projects.size) d.projects.filter((p) => !p.archived).forEach((p) => projects.add(p.id));
+      for (const pid of projects) {
+        const id = `${l.id}~${pid}`;
+        newLabels.push({ ...l, id, project_id: pid, updated_at: now() });
+        for (const tl of used.filter((x) => projectOf.get(x.task_id) === pid)) {
+          links.push({ ...tl, deleted: 1, updated_at: now() });
+          links.push({ id: `${tl.task_id}:${id}`, task_id: tl.task_id, label_id: id, updated_at: now(), deleted: 0 });
+        }
+      }
+    }
+    await write("labels", [...newLabels, ...old.map((l) => ({ ...l, deleted: 1, updated_at: now() }))]);
+    await write("task_labels", links);
+  };
+
   const columnName = (id: string | null) => (id ? (find("columns", id)?.name ?? "") : "Backlog");
 
   /** Wenn eine wiederkehrende Aufgabe erledigt wird: nächste Instanz anlegen. */
@@ -245,6 +283,8 @@ export const useStore = create<State>((set, get) => {
     settingsOpen: false,
     shortcutsOpen: false,
     projectDialog: null,
+    importDialog: null,
+    backupView: null,
     newTaskFor: null,
     menu: null,
     draftTaskId: null,
@@ -256,6 +296,7 @@ export const useStore = create<State>((set, get) => {
       // Entwürfe ohne Titel (App wurde beim Anlegen geschlossen) aufräumen
       const empty = get().data.tasks.filter((x) => !x.title).map((x) => x.id);
       if (empty.length) await get().deleteTasks(empty);
+      await migrateGlobalLabels();
       // Gespeicherte Ansicht prüfen (Projekt könnte gelöscht sein)
       const v = get().view;
       if (v.kind === "project" && !get().data.projects.some((p) => p.id === v.projectId)) get().go({ kind: "home" });
@@ -307,7 +348,7 @@ export const useStore = create<State>((set, get) => {
       const lang = get().lang;
       const position = Math.max(0, ...get().data.projects.map((p) => p.position)) + 1;
       await write("projects", [
-        { id, name, color, icon, key, description, position, archived: 0, updated_at: now(), deleted: 0 },
+        { id, name, color, icon, key, description, position, archived: 0, favorite: 0, updated_at: now(), deleted: 0 },
       ]);
       await write(
         "columns",
@@ -461,6 +502,19 @@ export const useStore = create<State>((set, get) => {
         }
       }
       for (const t of finished) await spawnRecurrence(t);
+
+      // Projekt gewechselt: Labels gehören zum Projekt -> gleichnamige Labels im neuen Projekt verwenden
+      if (fields.project_id) {
+        for (const id of ids) {
+          const d = get().data;
+          for (const tl of d.task_labels.filter((x) => x.task_id === id)) {
+            const label = d.labels.find((l) => l.id === tl.label_id);
+            if (!label || label.project_id === fields.project_id) continue;
+            await get().toggleLabel(id, label.id, false);
+            await get().toggleLabelByName(id, label.name, true, label.color);
+          }
+        }
+      }
     },
 
     deleteTasks: async (ids) => {
@@ -537,13 +591,23 @@ export const useStore = create<State>((set, get) => {
       ]);
     },
 
-    createLabel: async (name, color) => {
+    createLabel: async (projectId, name, color) => {
       const id = newId();
-      await write("labels", [{ id, name, color, updated_at: now(), deleted: 0 }]);
+      await write("labels", [{ id, project_id: projectId, name, color, updated_at: now(), deleted: 0 }]);
       return id;
     },
 
-    addSubtask: async (taskId, title) => {
+    toggleLabelByName: async (taskId, name, on, color) => {
+      const task = find("tasks", taskId);
+      if (!task) return;
+      const own = labelsOf(get().data, task.project_id);
+      let label = own.find((l) => l.name.toLowerCase() === name.toLowerCase());
+      if (!label && !on) return;
+      const id = label?.id ?? (await get().createLabel(task.project_id, name, color ?? COLORS[own.length % COLORS.length]));
+      await get().toggleLabel(taskId, id, on);
+    },
+
+    addSubtask: async (taskId, title, dueDate = null) => {
       const list = get().data.subtasks.filter((s) => s.task_id === taskId);
       await write("subtasks", [
         {
@@ -551,11 +615,20 @@ export const useStore = create<State>((set, get) => {
           task_id: taskId,
           title,
           done: 0,
+          due_date: dueDate,
           position: Math.max(-1, ...list.map((s) => s.position)) + 1,
           updated_at: now(),
           deleted: 0,
         },
       ]);
+    },
+
+    reorderSubtasks: async (ids) => {
+      const rows = ids
+        .map((id, i) => ({ row: find("subtasks", id)!, i }))
+        .filter(({ row, i }) => row && row.position !== i)
+        .map(({ row, i }) => ({ ...row, position: i, updated_at: now() }));
+      await write("subtasks", rows);
     },
 
     addComment: async (taskId, body) => {
@@ -617,6 +690,11 @@ export const useStore = create<State>((set, get) => {
 });
 
 // ---------- Abgeleitete Werte (Selektoren) ----------
+
+/** Labels eines Projekts */
+export function labelsOf(data: Data, projectId: string | null | undefined) {
+  return data.labels.filter((l) => l.project_id === projectId);
+}
 
 export function isDone(task: Task, columns: Column[]) {
   return !!task.column_id && !!columns.find((c) => c.id === task.column_id)?.is_done;

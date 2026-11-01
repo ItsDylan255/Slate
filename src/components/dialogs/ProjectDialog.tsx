@@ -1,22 +1,15 @@
 import { useState } from "react";
-import { Archive, Plus, Trash2 } from "lucide-react";
+import { Archive, FileDown, FileUp, Plus, Star, Trash2 } from "lucide-react";
+import { exportProject, keyFromName } from "../../lib/importer";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useStore } from "../../store";
 import type { FieldType } from "../../lib/types";
 import { COLORS } from "../../lib/priority";
 import { Modal } from "../ui/Modal";
+import { ProjectLabels } from "./ProjectLabels";
+import { createFromTemplate } from "../../lib/templates";
 import { Select } from "../ui/Select";
 import { useT, type TKey } from "../../i18n";
-
-const keyFromName = (name: string) =>
-  name
-    .replace(/[^A-Za-zÄÖÜäöü0-9 ]/g, "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w, _, all) => (all.length > 1 ? w[0] : w.slice(0, 3)))
-    .join("")
-    .slice(0, 4)
-    .toUpperCase();
 
 /** Projekt anlegen oder bearbeiten: Allgemein + eigene Felder. */
 export function ProjectDialog() {
@@ -24,7 +17,7 @@ export function ProjectDialog() {
   const req = useStore((s) => s.projectDialog)!;
   const project = useStore((s) => s.data.projects.find((p) => p.id === req.projectId));
   const { set, createProject, patch, deleteProject, go } = useStore.getState();
-  const [tab, setTab] = useState<"general" | "fields">("general");
+  const [tab, setTab] = useState<"general" | "labels" | "fields">("general");
 
   const [name, setName] = useState(project?.name ?? "");
   const [key, setKey] = useState(project?.key ?? "");
@@ -33,6 +26,8 @@ export function ProjectDialog() {
   // Farbauswahl gibt es nicht mehr – neue Projekte bekommen Grau, bestehende behalten ihre Farbe
   const color = project?.color ?? COLORS[0];
   const [description, setDescription] = useState(project?.description ?? "");
+  const templates = useStore((s) => s.data.templates);
+  const [template, setTemplate] = useState("standard");
 
   const close = () => set({ projectDialog: null });
 
@@ -41,7 +36,7 @@ export function ProjectDialog() {
     const values = { name: name.trim(), key: key.trim().toUpperCase(), icon, color, description: description.trim() };
     if (project) await patch("projects", project.id, values);
     else {
-      const id = await createProject(values);
+      const id = template === "standard" ? await createProject(values) : await createFromTemplate(template, values);
       go({ kind: "project", projectId: id, tab: "board" });
     }
     close();
@@ -51,13 +46,13 @@ export function ProjectDialog() {
     <Modal title={project ? t("project.settings") : t("project.new")} onClose={close} size="md">
       {project && (
         <div className="-mt-2 mb-4 flex gap-1 border-b border-border">
-          {(["general", "fields"] as const).map((id) => (
+          {(["general", "labels", "fields"] as const).map((id) => (
             <button
               key={id}
               onClick={() => setTab(id)}
               className={`-mb-px border-b-2 px-3 pb-2 text-sm ${tab === id ? "border-foreground font-medium" : "border-transparent text-muted-foreground"}`}
             >
-              {t(id === "general" ? "project.general" : "project.fields")}
+              {t(id === "general" ? "project.general" : id === "labels" ? "task.labels" : "project.fields")}
             </button>
           ))}
         </div>
@@ -102,10 +97,37 @@ export function ProjectDialog() {
               />
             </div>
           </div>
+          {!project && templates.length > 0 && (
+            <div>
+              <label className="label">{t("templates.pick")}</label>
+              <Select
+                value={template}
+                onChange={setTemplate}
+                options={[
+                  { value: "standard", label: t("templates.standard") },
+                  ...[...templates].sort((a, b) => a.position - b.position).map((x) => ({ value: x.id, label: x.name })),
+                ]}
+              />
+            </div>
+          )}
           <div>
             <label className="label">{t("project.description")}</label>
             <textarea className="input resize-none" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
+          {project && (
+            <div className="flex gap-2">
+              <button type="button" className="btn-outline" onClick={() => set({ projectDialog: null, importDialog: { projectId: project.id } })}>
+                <FileUp size={14} /> {t("import.tasks")}
+              </button>
+              <button type="button" className="btn-outline" onClick={() => exportProject(project.id).catch((e) => console.error(e))}>
+                <FileDown size={14} /> {t("import.exportProject")}
+              </button>
+              <button type="button" className="btn-outline" onClick={() => patch("projects", project.id, { favorite: project.favorite ? 0 : 1 })}>
+                <Star size={14} className={project.favorite ? "fill-amber-400 text-amber-400" : ""} />
+                {t(project.favorite ? "project.unfavorite" : "project.favorite")}
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-between border-t border-border pt-4 ">
             {project ? (
               <div className="flex gap-1">
@@ -147,6 +169,8 @@ export function ProjectDialog() {
             </div>
           </div>
         </form>
+      ) : tab === "labels" ? (
+        <ProjectLabels projectId={project!.id} />
       ) : (
         <FieldsEditor projectId={project!.id} />
       )}

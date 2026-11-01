@@ -40,7 +40,7 @@ Most project managers are web apps packed with features you will never use. Slat
 | ![Overview](docs/screenshots/home.png) | ![Command palette](docs/screenshots/palette.png) |
 
 - **Board** with drag & drop for cards and columns, four default columns (To do, In progress, In review, Done)
-- **List**, **Backlog**, **Calendar** and **Gantt** (drag bars to move, drag edges to change duration)
+- **List**, **Backlog**, **Calendar** (subtasks with a date appear too, with a dashed outline) and **Gantt** (drag bars to move, drag edges to change duration)
 - **Overview** with what is due today, overdue and this week, plus project progress
 - **My tasks** across all projects, grouped by due date
 - **Archive** for finished tasks and projects
@@ -49,7 +49,7 @@ Most project managers are web apps packed with features you will never use. Slat
 
 - Task numbers per project (e.g. `WEB-12`), priority, start date, due date and reminders
 - Markdown description with clickable checklists
-- Subtasks, labels, file attachments (just drag files into the window), links and relations (“blocks”, “relates to”, “duplicates”)
+- Subtasks with due dates (reorder them by drag & drop), labels per project with a color picker right in the task, file attachments (just drag files into the window), links and relations (“blocks”, “relates to”, “duplicates”)
 - Recurring tasks – when you complete one, the next one is created automatically
 - Custom fields per project (text, number, date, select, yes/no)
 - Change history
@@ -61,22 +61,26 @@ Most project managers are web apps packed with features you will never use. Slat
 - Keyboard shortcuts for almost everything (`?` shows them all)
 - Multi-select with `Ctrl`/`Shift`+click and bulk actions, right-click context menu
 - Filters by text, priority, labels and due date
+- Favorite projects are pinned in a collapsible section at the top of the sidebar
+- **Project templates** – define columns, labels, custom fields and starter tasks (or save an existing project as a template) and pick one when creating a project
 - Collapsible sidebar (`Ctrl+B`), light and dark mode
 
 ### Your data
 
 - **Automatic backups** – Slate always keeps exactly four: from the last day, the last 3 days, the last week and the last month. Restore any of them with one click.
+- **Old versions** – open any backup to browse your boards as they were back then (read only), and restore a single project from it as a copy.
 - Manual backup and import (JSON), export to CSV (Excel) and iCal (`.ics`)
+- **Import projects and tasks** – paste a list (one task per line, indented lines for description, subtasks, links and dates) or open a JSON/Markdown file, as a new project or into an existing one. *Export project* writes a JSON file with everything (columns, labels, custom fields, subtasks, links, relations) that can be imported again.
 - Windows notifications for reminders and a daily summary
 - Optional: start with Windows (minimized to the tray) and minimize to the tray when closing, so reminders and sync keep running
 
 ## Installation
 
-1. Download **`Slate_1.0.1_x64-setup.exe`** from the [latest release](https://github.com/ItsDylan255/Slate/releases/latest).
+1. Download **`Slate_1.1.0_x64-setup.exe`** from the [latest release](https://github.com/ItsDylan255/Slate/releases/latest).
 2. Run it. Windows SmartScreen may show *“Windows protected your PC”* because the app is not code-signed – click **More info → Run anyway**.
 3. Slate installs for your user (no admin rights needed) and adds a Start menu entry.
 
-**Updating:** Slate checks GitHub for new versions automatically and shows *“Update to …”* in the sidebar – one click installs it and restarts the app. You can also check manually in *Settings → General*. Your data is always kept. (Version 1.0.0 has no updater yet – install 1.0.1 once by hand.)
+**Updating:** Slate checks GitHub for new versions automatically and shows *“Update to …”* in the sidebar – one click installs it and restarts the app. You can also check manually in *Settings → General*. Your data is always kept. (Version 1.0.0 has no updater yet – install a newer version once by hand.)
 **Uninstalling:** *Windows Settings → Apps → Slate*. Your data stays in `%APPDATA%\com.dylan.projektmanager\` unless you delete it.
 
 An `.msi` package is available as well.
@@ -95,10 +99,12 @@ Slate can keep a dedicated **“Slate”** calendar in your Google account up to
 
 Because Slate has no server, it uses your own free Google Cloud project for the sign-in. The one-time setup takes about 10 minutes and is explained step by step in **Settings → Google Calendar**:
 
-1. Create a project in the [Google Cloud Console](https://console.cloud.google.com/) and enable the **Google Calendar API**.
+1. Create a project in the [Google Cloud Console](https://console.cloud.google.com/) and enable the **Google Calendar API** (and the **Google Tasks API** for the subtask sync).
 2. Configure the OAuth consent screen (audience “External”), add a homepage and privacy policy link on the *Branding* page, then **publish** the app.
 3. Create an OAuth client of type **Desktop app** and paste the client ID and secret into Slate.
 4. Click **Connect with Google**. Google shows “This app isn’t verified” for personal apps – choose **Advanced → Go to Slate**.
+
+**Google Tasks (optional):** in the same settings page you can sync subtasks with Google Tasks. Every task with subtasks appears in a “Slate” list, its subtasks below it. Checking off, titles and dates sync both ways, and subtasks you add in Google Tasks under a Slate task show up in Slate. This needs the **Google Tasks API** enabled in your Cloud project as well (connections made before version 1.0.2 have to reconnect once).
 
 See the [privacy policy](PRIVACY.md) for what Slate does with your Google data (in short: nothing leaves your computer except the calendar events themselves).
 

@@ -1,12 +1,73 @@
 import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { CalendarCheck, ChevronRight, ExternalLink, Loader2, RefreshCw, Unplug } from "lucide-react";
+import { CalendarCheck, ChevronRight, ExternalLink, ListChecks, Loader2, RefreshCw, Unplug } from "lucide-react";
 import { useStore } from "../../store";
 import { connectGoogle, disconnectGoogle, getGcalConfig, getGcalStatus, onGcalStatus, syncCalendar, type GcalStatus } from "../../lib/gcal";
 import { formatDateTime } from "../../lib/dates";
+import { getGtasksStatus, gtasksEnabled, onGtasksStatus, setGtasksEnabled, syncGoogleTasks, type GtasksStatus } from "../../lib/gtasks";
 import { useT, type TKey } from "../../i18n";
 
 const STEPS: TKey[] = ["gcal.step1", "gcal.step2", "gcal.step3", "gcal.step4", "gcal.step5", "gcal.step6"];
+
+/** Unteraufgaben mit Google Tasks abgleichen (an/aus, Status, ggf. neu verbinden) */
+function GoogleTasksSection({ onReconnect, busy }: { onReconnect: () => void; busy: boolean }) {
+  const t = useT();
+  const lang = useStore((s) => s.lang);
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [status, setStatus] = useState<GtasksStatus>(getGtasksStatus());
+
+  useEffect(() => {
+    gtasksEnabled().then(setEnabled);
+    const off = onGtasksStatus(setStatus);
+    return () => {
+      off();
+    };
+  }, []);
+  if (enabled === null) return null;
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4">
+      <label className="flex items-center gap-3">
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={enabled}
+          onChange={async (e) => {
+            setEnabled(e.target.checked);
+            await setGtasksEnabled(e.target.checked);
+          }}
+        />
+        <ListChecks className="size-4 text-muted-foreground" />
+        <span className="text-sm font-medium">{t("gtasks.enable")}</span>
+      </label>
+      <p className="text-xs text-muted-foreground">{t("gtasks.hint")}</p>
+      {enabled && status.state === "scope" && (
+        <div className="space-y-2 rounded-md bg-muted p-3 text-xs text-muted-foreground">
+          <p className="whitespace-pre-line">{t("gtasks.needScope")}</p>
+          <button className="btn-primary h-7 text-xs" onClick={onReconnect} disabled={busy}>
+            {busy && <Loader2 className="size-3.5 animate-spin" />} {t("gtasks.reconnect")}
+          </button>
+        </div>
+      )}
+      {enabled && status.state !== "scope" && (
+        <div className="flex items-center gap-3">
+          <button className="btn-outline" onClick={() => syncGoogleTasks()} disabled={status.state === "syncing"}>
+            <RefreshCw className={`size-3.5 ${status.state === "syncing" ? "animate-spin" : ""}`} /> {t("sync.now")}
+          </button>
+          <span className={`text-xs ${status.state === "error" ? "text-destructive" : "text-muted-foreground"}`}>
+            {status.state === "syncing"
+              ? t("sync.syncing")
+              : status.state === "error"
+                ? `${t("sync.error")}: ${status.error}`
+                : status.last
+                  ? `${t("sync.last", { time: formatDateTime(status.last, lang) })} · ${t("gtasks.count", { n: status.count ?? 0 })}`
+                  : ""}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Einstellungen → Google Kalender: Anleitung, Zugangsdaten, Verbinden/Trennen, Status. */
 export function GoogleCalendarSettings() {
@@ -90,6 +151,10 @@ export function GoogleCalendarSettings() {
             </button>
           </div>
         </div>
+      ) : null}
+
+      {connected ? (
+        <GoogleTasksSection onReconnect={connect} busy={busy} />
       ) : (
         <div className="space-y-3">
           <div>

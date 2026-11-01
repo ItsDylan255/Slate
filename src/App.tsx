@@ -6,6 +6,7 @@ import { startReminders } from "./lib/reminders";
 import { restoreNewestBackup, startBackups } from "./lib/backup";
 import { startGcal } from "./lib/gcal";
 import { startUpdater } from "./lib/updater";
+import { startGtasks } from "./lib/gtasks";
 import { desktop } from "./lib/desktop";
 import { translate } from "./i18n";
 import { native } from "./lib/native";
@@ -18,6 +19,8 @@ import { TaskDialog } from "./components/taskdialog/TaskDialog";
 import { ProjectDialog } from "./components/dialogs/ProjectDialog";
 import { NewTaskDialog } from "./components/dialogs/NewTaskDialog";
 import { SettingsDialog } from "./components/dialogs/SettingsDialog";
+import { ImportDialog } from "./components/dialogs/ImportDialog";
+import { BackupViewer } from "./components/dialogs/BackupViewer";
 import { ShortcutsDialog } from "./components/dialogs/ShortcutsDialog";
 import { HomeView } from "./views/HomeView";
 import { MyTasksView } from "./views/MyTasksView";
@@ -35,6 +38,8 @@ export default function App() {
   const settingsOpen = useStore((s) => s.settingsOpen);
   const shortcutsOpen = useStore((s) => s.shortcutsOpen);
   const projectDialog = useStore((s) => s.projectDialog);
+  const importDialog = useStore((s) => s.importDialog);
+  const backupView = useStore((s) => s.backupView);
   const newTaskFor = useStore((s) => s.newTaskFor);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +58,7 @@ export default function App() {
         startBackups();
         startGcal().catch(() => {});
         startUpdater();
+        startGtasks().catch(() => {});
       })
       .catch((e) => setError(String(e)));
   }, []);
@@ -108,6 +114,8 @@ export default function App() {
       {newTaskFor && !hasProjects && <NewTaskDialog />}
       {projectDialog && <ProjectDialog key={projectDialog.projectId ?? "new"} />}
       {settingsOpen && <SettingsDialog />}
+      {importDialog && <ImportDialog />}
+      {backupView && <BackupViewer key={backupView.at} />}
       {shortcutsOpen && <ShortcutsDialog />}
       {paletteOpen && <CommandPalette />}
     </div>

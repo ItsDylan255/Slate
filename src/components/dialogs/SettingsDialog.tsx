@@ -1,27 +1,26 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { CalendarDays, Cloud, Database, Download, FolderOpen, Keyboard, Palette, RefreshCw, Sheet, Tag, Trash2, Upload, History, RotateCcw } from "lucide-react";
+import { Eye, LayoutTemplate, FileUp, CalendarDays, Cloud, Database, Download, FolderOpen, Keyboard, Palette, RefreshCw, Sheet, Upload, History, RotateCcw } from "lucide-react";
 import { useStore } from "../../store";
-import { COLORS } from "../../lib/priority";
 import { getSyncConfig, setSyncConfig, suggestSyncDir, syncNow } from "../../lib/sync";
 import { exportBackup, exportCsv, exportIcs, importBackup } from "../../lib/export";
 import { native } from "../../lib/native";
-import { BACKUP_SLOTS, backupDir, backupTimes, restoreBackup, type SlotKey } from "../../lib/backup";
+import { BACKUP_SLOTS, backupDir, backupTimes, pickBackupFile, readBackup, restoreBackup, type SlotKey } from "../../lib/backup";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { formatDateTime } from "../../lib/dates";
 import { Modal } from "../ui/Modal";
-import { ConfirmButton } from "../ui/ConfirmButton";
 import { ShortcutsList } from "./ShortcutsDialog";
 import { GoogleCalendarSettings } from "./GoogleCalendarSettings";
+import { TemplatesSettings } from "./TemplatesSettings";
 import { useT, type TKey } from "../../i18n";
 import { getVersion } from "@tauri-apps/api/app";
 import { desktop, type WindowPrefs } from "../../lib/desktop";
 import { checkForUpdate, installUpdate, useUpdate } from "../../lib/updater";
 
-type Tab = "general" | "labels" | "sync" | "gcal" | "data" | "shortcuts";
+type Tab = "general" | "templates" | "sync" | "gcal" | "data" | "shortcuts";
 const TABS: { id: Tab; label: TKey; icon: typeof Palette }[] = [
   { id: "general", label: "settings.general", icon: Palette },
-  { id: "labels", label: "task.labels", icon: Tag },
+  { id: "templates", label: "templates.title", icon: LayoutTemplate },
   { id: "sync", label: "settings.sync", icon: Cloud },
   { id: "gcal", label: "settings.gcal", icon: CalendarDays },
   { id: "data", label: "settings.data", icon: Database },
@@ -47,9 +46,9 @@ export function SettingsDialog() {
             </button>
           ))}
         </nav>
-        <div className="min-w-0 flex-1 p-6" onKeyDown={(e) => e.stopPropagation()}>
+        <div className="max-h-[75vh] min-w-0 flex-1 overflow-y-auto p-6" onKeyDown={(e) => e.stopPropagation()}>
           {tab === "general" && <General />}
-          {tab === "labels" && <Labels />}
+          {tab === "templates" && <TemplatesSettings />}
           {tab === "sync" && <Sync />}
           {tab === "gcal" && <GoogleCalendarSettings />}
           {tab === "data" && <DataTab />}
@@ -197,60 +196,6 @@ function UpdateSection() {
   );
 }
 
-function Labels() {
-  const t = useT();
-  const labels = useStore((s) => s.data.labels);
-  const usage = useStore((s) => s.data.task_labels);
-  const { createLabel, patch, remove } = useStore.getState();
-  const [name, setName] = useState("");
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">{t("labels.hint")}</p>
-      <div className="space-y-2">
-        {labels.map((l) => (
-          <div key={l.id} className="flex items-center gap-2">
-            <div className="flex gap-1">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => patch("labels", l.id, { color: c })}
-                  className={`h-4 w-4 rounded-full ${l.color === c ? "ring-2 ring-ring ring-offset-1 ring-offset-popover" : ""}`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
-            <input
-              className="input py-1"
-              defaultValue={l.name}
-              onBlur={(e) => e.target.value.trim() && e.target.value !== l.name && patch("labels", l.id, { name: e.target.value.trim() })}
-            />
-            <span className="w-16 shrink-0 text-right text-xs text-muted-foreground/70">{t("labels.used", { n: usage.filter((u) => u.label_id === l.id).length })}</span>
-            <ConfirmButton className="btn-icon shrink-0" confirmText="?" onConfirm={() => remove("labels", l.id)}>
-              <Trash2 size={13} />
-            </ConfirmButton>
-          </div>
-        ))}
-        {labels.length === 0 && <p className="text-sm text-muted-foreground/70">{t("labels.none")}</p>}
-      </div>
-      <form
-        className="flex gap-2"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!name.trim()) return;
-          await createLabel(name.trim(), COLORS[labels.length % COLORS.length]);
-          setName("");
-        }}
-      >
-        <input className="input" placeholder={t("labels.newName")} value={name} onChange={(e) => setName(e.target.value)} />
-        <button className="btn-primary shrink-0" disabled={!name.trim()}>
-          {t("common.add")}
-        </button>
-      </form>
-    </div>
-  );
-}
-
 function Sync() {
   const t = useT();
   const lang = useStore((s) => s.lang);
@@ -379,6 +324,12 @@ function DataTab() {
         action={<button className="btn-ghost shrink-0 border border-border" onClick={run(importBackup, (n) => t("backup.imported", { n: Number(n) }))}>{t("backup.importBtn")}</button>}
       />
       <Item
+        icon={<FileUp size={18} />}
+        title={t("import.title")}
+        text={t("import.settingsText")}
+        action={<button className="btn-ghost shrink-0 border border-border" onClick={() => useStore.getState().set({ settingsOpen: false, importDialog: {} })}>{t("import.open")}</button>}
+      />
+      <Item
         icon={<Sheet size={18} />}
         title={t("csv.title")}
         text={t("csv.text")}
@@ -423,6 +374,19 @@ function AutoBackups({ onMessage }: { onMessage: (m: string | null) => void }) {
           <div className="text-sm font-medium">{t("backup.auto")}</div>
           <div className="text-xs text-muted-foreground">{t("backup.autoText")}</div>
         </div>
+        <button
+          className="btn-outline shrink-0"
+          onClick={async () => {
+            try {
+              const b = await pickBackupFile();
+              if (b) useStore.getState().set({ settingsOpen: false, backupView: b });
+            } catch (e) {
+              onMessage(`${t("common.error")}: ${String(e).includes("backup.invalid") ? t("backup.invalid") : e}`);
+            }
+          }}
+        >
+          <Eye size={14} /> {t("versions.openFile")}
+        </button>
         <button className="btn-outline shrink-0" onClick={async () => native.openPath(await backupDir())}>
           <FolderOpen size={14} /> {t("common.open")}
         </button>
@@ -434,6 +398,20 @@ function AutoBackups({ onMessage }: { onMessage: (m: string | null) => void }) {
             <div key={slot.key} className="flex h-10 items-center gap-3 px-3 text-[13px]">
               <span className="w-28 shrink-0 font-medium">{t(labels[slot.key])}</span>
               <span className="flex-1 text-muted-foreground">{at ? formatDateTime(at, lang) : t("backup.none")}</span>
+              {at && (
+                <button
+                  className="btn-ghost h-7 px-2 text-xs"
+                  onClick={async () => {
+                    try {
+                      useStore.getState().set({ settingsOpen: false, backupView: await readBackup(slot.key) });
+                    } catch (e) {
+                      onMessage(`${t("common.error")}: ${e}`);
+                    }
+                  }}
+                >
+                  <Eye size={13} /> {t("versions.view")}
+                </button>
+              )}
               {at && (
                 <button
                   className="btn-ghost h-7 px-2 text-xs"

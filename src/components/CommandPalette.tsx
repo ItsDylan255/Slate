@@ -13,6 +13,7 @@ import {
   Search,
   Settings,
   SquareCheck,
+  FileUp,
 } from "lucide-react";
 import { isDone, taskKey, useStore } from "../store";
 import { matchesText } from "../lib/filter";
@@ -53,6 +54,7 @@ export function CommandPalette() {
       { id: "a-home", group: t("palette.actions"), icon: <Home size={14} />, label: t("nav.home"), hint: "G H", run: () => go({ kind: "home" }) },
       { id: "a-my", group: t("palette.actions"), icon: <ListChecks size={14} />, label: t("nav.myTasks"), hint: "G M", run: () => go({ kind: "my" }) },
       { id: "a-archive", group: t("palette.actions"), icon: <Archive size={14} />, label: t("nav.archive"), hint: "G A", run: () => go({ kind: "archive" }) },
+      { id: "a-import", group: t("palette.actions"), icon: <FileUp size={14} />, label: t("import.title"), run: () => set({ importDialog: { projectId: currentProject } }) },
       { id: "a-settings", group: t("palette.actions"), icon: <Settings size={14} />, label: t("nav.settings"), hint: t("kbd.ctrlComma"), run: () => set({ settingsOpen: true }) },
       { id: "a-sync", group: t("palette.actions"), icon: <RefreshCw size={14} />, label: t("sync.now"), run: () => syncNow() },
       { id: "a-theme", group: t("palette.actions"), icon: <Moon size={14} />, label: dark ? t("theme.light") : t("theme.dark"), run: () => setDark(!dark) },

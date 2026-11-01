@@ -34,7 +34,8 @@ export function DatePicker({
   value: string | null;
   onChange: (value: string | null) => void;
   withTime?: boolean;
-  variant?: "input" | "ghost";
+  /** compact = kleines Kalender-Symbol bzw. kurzes Datum (z. B. bei Unteraufgaben) */
+  variant?: "input" | "ghost" | "compact";
   placeholder?: string;
   className?: string;
 }) {
@@ -46,9 +47,13 @@ export function DatePicker({
   const [month, setMonth] = useState(() => startOfMonth(datePart ? parseISO(datePart) : new Date()));
   const [time, setTime] = useState(timePart);
 
+  const compact = variant === "compact";
   const label = datePart
-    ? format(parseISO(datePart), lang === "de" ? "d. MMM yyyy" : "MMM d, yyyy", { locale: locale(lang) }) + (withTime ? ` · ${timePart}` : "")
-    : (placeholder ?? t("date.pick"));
+    ? format(parseISO(datePart), compact ? (lang === "de" ? "d. MMM" : "MMM d") : lang === "de" ? "d. MMM yyyy" : "MMM d, yyyy", { locale: locale(lang) }) +
+      (withTime ? ` · ${timePart}` : "")
+    : compact
+      ? ""
+      : (placeholder ?? t("date.pick"));
 
   const emit = (day: string | null, tm = time) => onChange(day ? (withTime ? `${day}T${/^\d{2}:\d{2}$/.test(tm) ? tm : "09:00"}` : day) : null);
   const pick = (day: string | null) => {
@@ -70,11 +75,16 @@ export function DatePicker({
           setTime(timePart);
           pop.open(e);
         }}
-        className={`${variant === "ghost" ? "input-ghost" : "input"} group flex items-center gap-2 text-left ${className}`}
+        title={compact ? (placeholder ?? t("date.pick")) : undefined}
+        className={
+          compact
+            ? `group flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground ${className}`
+            : `${variant === "ghost" ? "input-ghost" : "input"} group flex items-center gap-2 text-left ${className}`
+        }
       >
         <Calendar className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className={`min-w-0 flex-1 truncate ${datePart ? "" : "text-muted-foreground/70"}`}>{label}</span>
-        {datePart && (
+        {(label || !compact) && <span className={`min-w-0 flex-1 truncate ${datePart ? "" : "text-muted-foreground/70"}`}>{label}</span>}
+        {datePart && !compact && (
           <span
             role="button"
             title={t("common.clear")}

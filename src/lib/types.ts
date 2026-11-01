@@ -17,6 +17,7 @@ export interface Project extends Row {
   color: string;
   position: number;
   archived: number;
+  favorite: number; // 1 = oben in der Seitenleiste unter "Favoriten"
 }
 
 export interface Column extends Row {
@@ -43,6 +44,7 @@ export interface Task extends Row {
 }
 
 export interface Label extends Row {
+  project_id: string | null; // Labels gehören zu einem Projekt
   name: string;
   color: string;
 }
@@ -57,6 +59,7 @@ export interface Subtask extends Row {
   title: string;
   done: number;
   position: number;
+  due_date: string | null; // "YYYY-MM-DD"
 }
 
 export interface Attachment extends Row {
@@ -111,6 +114,13 @@ export interface FieldValue extends Row {
   value: string;
 }
 
+/** Projektvorlage. data = ImportProject als JSON (siehe lib/importer.ts) */
+export interface Template extends Row {
+  name: string;
+  data: string;
+  position: number;
+}
+
 /** Alle synchronisierten Tabellen und ihr Zeilentyp. */
 export interface Tables {
   projects: Project;
@@ -126,6 +136,7 @@ export interface Tables {
   links: Link;
   fields: Field;
   field_values: FieldValue;
+  templates: Template;
 }
 
 export type TableName = keyof Tables;
@@ -144,6 +155,7 @@ export const TABLES: TableName[] = [
   "links",
   "fields",
   "field_values",
+  "templates",
 ];
 
 export type Data = { [K in TableName]: Tables[K][] };

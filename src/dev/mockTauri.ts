@@ -5,6 +5,8 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import initSqlJs from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import migration2 from "../../src-tauri/migrations/002_sync_ready_schema.sql?raw";
+import migration3 from "../../src-tauri/migrations/003_subtask_dates_project_labels_favorites.sql?raw";
+import migration4 from "../../src-tauri/migrations/004_templates.sql?raw";
 
 const MIGRATION_1 = `
 CREATE TABLE projects (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, color TEXT NOT NULL DEFAULT '#6366f1', position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')));
@@ -20,11 +22,58 @@ const files = new Map<string, string>();
 // Nachgemachte Google-API (Token + Kalender), um den Abgleich im Browser zu testen
 const fakeCal = { calendars: [] as { id: string; summary: string }[], events: new Map<string, Record<string, unknown>>(), calls: [] as string[] };
 (window as unknown as { __fakeCal: typeof fakeCal }).__fakeCal = fakeCal;
+// Nachgemachtes Google Tasks
+const fakeTasks = { lists: [] as { id: string; title: string }[], tasks: new Map<string, Record<string, unknown>>(), n: 0 };
+(window as unknown as { __fakeTasks: typeof fakeTasks }).__fakeTasks = fakeTasks;
+function fakeTasksApi(method: string, u: URL, body: string | null, json: (c: number, d: unknown) => [number, string]): [number, string] {
+  const path = u.pathname.replace("/tasks/v1", "");
+  const now = () => new Date(Date.now() + 1).toISOString();
+  if (path === "/users/@me/lists" && method === "GET") return json(200, { items: fakeTasks.lists });
+  if (path === "/users/@me/lists" && method === "POST") {
+    const l = { id: "list" + (fakeTasks.lists.length + 1), title: JSON.parse(body!).title };
+    fakeTasks.lists.push(l);
+    return json(200, l);
+  }
+  let m = path.match(/^\/users\/@me\/lists\/([^/]+)$/);
+  if (m) return json(fakeTasks.lists.some((l) => l.id === m![1]) ? 200 : 404, {});
+  const pos = (prev: string | null) => {
+    const p = prev ? (fakeTasks.tasks.get(prev)?.position as string) : null;
+    return p ? p + "m" : String(++fakeTasks.n).padStart(10, "0");
+  };
+  m = path.match(/^\/lists\/[^/]+\/tasks(?:\/([^/]+))?(\/move)?$/);
+  if (!m) return json(404, {});
+  const [, id, move] = m;
+  if (!id && method === "GET") return json(200, { items: [...fakeTasks.tasks.values()] });
+  if (!id && method === "POST") {
+    const t = { status: "needsAction", ...JSON.parse(body!), id: "g" + ++fakeTasks.n, updated: now(), parent: u.searchParams.get("parent") ?? undefined, position: pos(u.searchParams.get("previous")) };
+    fakeTasks.tasks.set(t.id, t);
+    return json(200, t);
+  }
+  const t = fakeTasks.tasks.get(id!);
+  if (!t) return json(404, {});
+  if (move) {
+    Object.assign(t, { parent: u.searchParams.get("parent") ?? undefined, position: pos(u.searchParams.get("previous")), updated: now() });
+    return json(200, t);
+  }
+  if (method === "PATCH") {
+    Object.assign(t, JSON.parse(body!), { updated: now() });
+    return json(200, t);
+  }
+  if (method === "DELETE") {
+    fakeTasks.tasks.delete(id!);
+    for (const [k, c] of fakeTasks.tasks) if (c.parent === id) fakeTasks.tasks.delete(k);
+    return [204, ""];
+  }
+  return json(200, t);
+}
+
 function fakeGoogle(method: string, url: string, body: string | null): [number, string] {
   const u = new URL(url);
   fakeCal.calls.push(`${method} ${u.pathname}`);
   const json = (code: number, data: unknown): [number, string] => [code, JSON.stringify(data)];
-  if (u.host === "oauth2.googleapis.com") return json(200, { access_token: "tok", expires_in: 3600, refresh_token: "refresh" });
+  if (u.host === "oauth2.googleapis.com")
+    return json(200, { access_token: "tok", expires_in: 3600, refresh_token: "refresh", scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks" });
+  if (u.host === "tasks.googleapis.com") return fakeTasksApi(method, u, body, json);
   const path = u.pathname.replace("/calendar/v3", "");
   if (path === "/users/me/calendarList") return json(200, { items: fakeCal.calendars });
   if (path === "/calendars" && method === "POST") {
@@ -61,6 +110,8 @@ export async function installMock() {
   const db = new SQL.Database();
   db.exec(MIGRATION_1);
   db.exec(migration2);
+  db.exec(migration3);
+  db.exec(migration4);
 
   const bind = (values: unknown[] = []) => Object.fromEntries(values.map((v, i) => [`$${i + 1}`, v as never]));
 

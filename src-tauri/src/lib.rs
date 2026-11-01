@@ -56,6 +56,18 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/002_sync_ready_schema.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "subtask_dates_project_labels_favorites",
+            sql: include_str!("../migrations/003_subtask_dates_project_labels_favorites.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 4,
+            description: "templates",
+            sql: include_str!("../migrations/004_templates.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

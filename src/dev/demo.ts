@@ -19,12 +19,12 @@ export async function runDemo(params: URLSearchParams) {
   // Altes Testprojekt aus der Migration entfernen
   for (const p of [...s().data.projects]) await s().deleteProject(p.id);
 
-  const label = async (name: string, color: string) => s().createLabel(name, color);
-  const design = await label("Design", "#8b5cf6");
-  const frontend = await label("Frontend", "#3b82f6");
-  const bug = await label("Bug", "#ef4444");
-  const content = await label("Content", "#f59e0b");
-  const research = await label("Research", "#10b981");
+  type L = { name: string; color: string };
+  const design: L = { name: "Design", color: "#8b5cf6" };
+  const frontend: L = { name: "Frontend", color: "#3b82f6" };
+  const bug: L = { name: "Bug", color: "#ef4444" };
+  const content: L = { name: "Content", color: "#f59e0b" };
+  const research: L = { name: "Research", color: "#10b981" };
 
   const web = await s().createProject({ name: "Website Relaunch", key: "WEB", color: "#71717a", icon: "", description: "New marketing site and pricing pages" });
   const app = await s().createProject({ name: "Mobile App", key: "APP", color: "#6366f1", icon: "", description: "" });
@@ -34,7 +34,7 @@ export async function runDemo(params: URLSearchParams) {
   const cols = (pid: string) => s().data.columns.filter((c) => c.project_id === pid).sort((a, b) => a.position - b.position);
   const [todo, doing, review, done] = cols(web).map((c) => c.id);
 
-  type T = { col: string | null; title: string; prio?: "none" | "low" | "medium" | "high" | "urgent"; due?: number; start?: number; labels?: string[]; subs?: [string, boolean][]; desc?: string };
+  type T = { col: string | null; title: string; prio?: "none" | "low" | "medium" | "high" | "urgent"; due?: number; start?: number; labels?: L[]; subs?: [string, boolean][]; desc?: string };
   const make = async (pid: string, t: T) => {
     const id = await s().createTask(pid, t.col, t.title, {
       priority: t.prio ?? "none",
@@ -42,7 +42,7 @@ export async function runDemo(params: URLSearchParams) {
       start_date: t.start === undefined ? null : day(t.start),
       description: t.desc ?? "",
     });
-    for (const l of t.labels ?? []) await s().toggleLabel(id, l, true);
+    for (const l of t.labels ?? []) await s().toggleLabelByName(id, l.name, true, l.color);
     for (const [title, isDone] of t.subs ?? []) {
       await s().addSubtask(id, title);
       if (isDone) {
