@@ -1,0 +1,4 @@
+# Datenbank-Migrationen immer mit LF auschecken: die Prüfsumme hängt am genauen Inhalt
+# (auch Migration 1 steht als Text in lib.rs). Sonst schlägt der Start nach einem Update fehl.
+src-tauri/migrations/*.sql text eol=lf
+src-tauri/src/lib.rs text eol=lf
