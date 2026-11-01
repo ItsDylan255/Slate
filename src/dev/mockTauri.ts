@@ -64,6 +64,8 @@ export async function installMock() {
 
   const bind = (values: unknown[] = []) => Object.fromEntries(values.map((v, i) => [`$${i + 1}`, v as never]));
 
+  let windowPrefs = { closeToTray: true, startMinimized: true };
+  let autostart = false;
   mockWindows("main");
   mockIPC(
     (cmd, payload) => {
@@ -114,6 +116,21 @@ export async function installMock() {
         case "plugin:dialog|ask":
         case "plugin:dialog|confirm":
           return true;
+        case "get_window_prefs":
+          return windowPrefs;
+        case "set_window_prefs":
+          windowPrefs = p.prefs as typeof windowPrefs;
+          return null;
+        case "plugin:autostart|is_enabled":
+          return autostart;
+        case "plugin:autostart|enable":
+        case "plugin:autostart|disable":
+          autostart = cmd.endsWith("enable") && !cmd.endsWith("disable");
+          return null;
+        case "plugin:app|version":
+          return "1.0.1";
+        case "plugin:updater|check":
+          return null;
         default:
           console.log("[mock] unhandled", cmd, p);
           return null;

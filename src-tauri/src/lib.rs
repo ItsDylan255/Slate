@@ -1,8 +1,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use std::sync::Mutex;
+
 use base64::Engine;
-use tauri::Manager;
+use serde::{Deserialize, Serialize};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Manager, WindowEvent, Wry};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
@@ -274,19 +279,114 @@ async fn http_request(
     Ok((status, text))
 }
 
+// ---------- Fenster, Tray und Autostart ----------
+// Liegen in einer kleinen Datei statt in der Datenbank, weil Rust sie schon beim Start
+// braucht (bevor die Oberfläche geladen ist).
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase", default)]
+struct WindowPrefs {
+    /// Schließen-Knopf versteckt das Fenster im Tray, statt Slate zu beenden
+    close_to_tray: bool,
+    /// Beim Autostart mit Windows nur im Tray starten
+    start_minimized: bool,
+}
+
+impl Default for WindowPrefs {
+    fn default() -> Self {
+        Self { close_to_tray: true, start_minimized: true }
+    }
+}
+
+struct Prefs(Mutex<WindowPrefs>);
+struct TrayItems {
+    show: MenuItem<Wry>,
+    quit: MenuItem<Wry>,
+}
+
+/// Argument, mit dem Windows Slate beim Hochfahren startet
+const AUTOSTART_ARG: &str = "--autostart";
+
+fn prefs_file(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_data_dir().ok().map(|d| d.join("window.json"))
+}
+
+fn load_prefs(app: &AppHandle) -> WindowPrefs {
+    prefs_file(app)
+        .and_then(|p| fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn show_main(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
+#[tauri::command]
+fn get_window_prefs(state: tauri::State<Prefs>) -> WindowPrefs {
+    state.0.lock().unwrap().clone()
+}
+
+#[tauri::command]
+fn set_window_prefs(app: AppHandle, state: tauri::State<Prefs>, prefs: WindowPrefs) -> CmdResult<()> {
+    let path = prefs_file(&app).ok_or("no app data dir")?;
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(err)?;
+    }
+    fs::write(path, serde_json::to_string_pretty(&prefs).map_err(err)?).map_err(err)?;
+    *state.0.lock().unwrap() = prefs;
+    Ok(())
+}
+
+/// Tray-Menü in der Sprache der Oberfläche beschriften
+#[tauri::command]
+fn set_tray_labels(items: tauri::State<TrayItems>, show: String, quit: String) -> CmdResult<()> {
+    items.show.set_text(show).map_err(err)?;
+    items.quit.set_text(quit).map_err(err)?;
+    Ok(())
+}
+
+fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
+    let show = MenuItem::with_id(app, "show", "Slate öffnen", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &quit])?;
+    TrayIconBuilder::with_id("main")
+        .icon(app.default_window_icon().cloned().expect("app icon"))
+        .tooltip("Slate")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, e| match e.id.as_ref() {
+            "show" => show_main(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, e| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
+                show_main(tray.app_handle());
+            }
+        })
+        .build(app)?;
+    app.manage(TrayItems { show, quit });
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         // Nur eine Slate-Instanz: ein zweiter Start holt das vorhandene Fenster nach vorne,
         // statt die Datenbank ein zweites Mal zu öffnen.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.show();
-                let _ = w.set_focus();
-            }
-        }))
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![AUTOSTART_ARG]),
+        ))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(
@@ -294,7 +394,32 @@ pub fn run() {
                 .add_migrations("sqlite:projekt-manager.db", migrations())
                 .build(),
         )
+        .setup(|app| {
+            let handle = app.handle();
+            let prefs = load_prefs(handle);
+            // Das Fenster startet unsichtbar (tauri.conf.json) und wird hier gezeigt –
+            // außer beim Windows-Autostart mit "minimiert im Tray starten".
+            let autostarted = std::env::args().any(|a| a == AUTOSTART_ARG);
+            if !(autostarted && prefs.start_minimized) {
+                show_main(handle);
+            }
+            app.manage(Prefs(Mutex::new(prefs)));
+            setup_tray(handle)?;
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let to_tray = window.state::<Prefs>().0.lock().unwrap().close_to_tray;
+                if to_tray {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
+            get_window_prefs,
+            set_window_prefs,
+            set_tray_labels,
             find_google_drive,
             app_data_path,
             read_text_file,

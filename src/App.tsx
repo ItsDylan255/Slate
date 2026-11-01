@@ -5,6 +5,9 @@ import { startAutoSync } from "./lib/sync";
 import { startReminders } from "./lib/reminders";
 import { restoreNewestBackup, startBackups } from "./lib/backup";
 import { startGcal } from "./lib/gcal";
+import { startUpdater } from "./lib/updater";
+import { desktop } from "./lib/desktop";
+import { translate } from "./i18n";
 import { native } from "./lib/native";
 import { useGlobalShortcuts } from "./lib/shortcuts";
 import { Sidebar } from "./components/Sidebar";
@@ -49,6 +52,7 @@ export default function App() {
         startReminders().catch(() => {});
         startBackups();
         startGcal().catch(() => {});
+        startUpdater();
       })
       .catch((e) => setError(String(e)));
   }, []);
@@ -63,6 +67,10 @@ export default function App() {
     document.documentElement.classList.toggle("dark", dark);
     document.documentElement.lang = lang;
   }, [dark, lang]);
+
+  useEffect(() => {
+    desktop.setTrayLabels(translate(lang, "tray.show"), translate(lang, "tray.quit")).catch(() => {});
+  }, [lang]);
 
   // Für Strg+A: alle Aufgaben, die in der aktuellen Ansicht zu sehen sind
   const visibleTaskIds = useCallback(() => {

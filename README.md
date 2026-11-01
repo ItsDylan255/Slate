@@ -68,14 +68,15 @@ Most project managers are web apps packed with features you will never use. Slat
 - **Automatic backups** – Slate always keeps exactly four: from the last day, the last 3 days, the last week and the last month. Restore any of them with one click.
 - Manual backup and import (JSON), export to CSV (Excel) and iCal (`.ics`)
 - Windows notifications for reminders and a daily summary
+- Optional: start with Windows (minimized to the tray) and minimize to the tray when closing, so reminders and sync keep running
 
 ## Installation
 
-1. Download **`Slate_1.0.0_x64-setup.exe`** from the [latest release](https://github.com/ItsDylan255/Slate/releases/latest).
+1. Download **`Slate_1.0.1_x64-setup.exe`** from the [latest release](https://github.com/ItsDylan255/Slate/releases/latest).
 2. Run it. Windows SmartScreen may show *“Windows protected your PC”* because the app is not code-signed – click **More info → Run anyway**.
 3. Slate installs for your user (no admin rights needed) and adds a Start menu entry.
 
-**Updating:** run the newer installer – your data is kept.
+**Updating:** Slate checks GitHub for new versions automatically and shows *“Update to …”* in the sidebar – one click installs it and restarts the app. You can also check manually in *Settings → General*. Your data is always kept. (Version 1.0.0 has no updater yet – install 1.0.1 once by hand.)
 **Uninstalling:** *Windows Settings → Apps → Slate*. Your data stays in `%APPDATA%\com.dylan.projektmanager\` unless you delete it.
 
 An `.msi` package is available as well.
@@ -111,6 +112,8 @@ npm run tauri dev    # run the desktop app in development mode
 npm run tauri build  # build the installers -> src-tauri/target/release/bundle/
 npm run dev          # UI only, in the browser with an in-memory test database
 ```
+
+**Releases with auto-update:** set `TAURI_SIGNING_PRIVATE_KEY` (path to the updater key) before `npm run tauri build`, then run `node scripts/latest-json.mjs "notes"` and upload the setup `.exe` and `latest.json` to the GitHub release. The updater only accepts builds signed with this key.
 
 Opening `http://localhost:1420/?demo&lang=en` in dev mode fills the browser version with sample data (used for the screenshots above).
 

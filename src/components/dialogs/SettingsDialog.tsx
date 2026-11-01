@@ -14,6 +14,9 @@ import { ConfirmButton } from "../ui/ConfirmButton";
 import { ShortcutsList } from "./ShortcutsDialog";
 import { GoogleCalendarSettings } from "./GoogleCalendarSettings";
 import { useT, type TKey } from "../../i18n";
+import { getVersion } from "@tauri-apps/api/app";
+import { desktop, type WindowPrefs } from "../../lib/desktop";
+import { checkForUpdate, installUpdate, useUpdate } from "../../lib/updater";
 
 type Tab = "general" | "labels" | "sync" | "gcal" | "data" | "shortcuts";
 const TABS: { id: Tab; label: TKey; icon: typeof Palette }[] = [
@@ -93,6 +96,102 @@ function General() {
             🌙 {t("theme.darkShort")}
           </Opt>
         </div>
+      </div>
+      <WindowsSection />
+      <UpdateSection />
+    </div>
+  );
+}
+
+/** Autostart, Start im Tray und Schließen in den Tray */
+function WindowsSection() {
+  const t = useT();
+  const [autostart, setAutostart] = useState<boolean | null>(null);
+  const [prefs, setPrefs] = useState<WindowPrefs | null>(null);
+
+  useEffect(() => {
+    desktop.autostartEnabled().then(setAutostart).catch(() => setAutostart(false));
+    desktop.getPrefs().then(setPrefs).catch(() => {});
+  }, []);
+
+  if (autostart === null || !prefs) return null;
+  const savePrefs = (p: Partial<WindowPrefs>) => {
+    const next = { ...prefs, ...p };
+    setPrefs(next);
+    desktop.setPrefs(next).catch((e) => console.error(e));
+  };
+
+  const Check = ({ checked, disabled, onChange, label }: { checked: boolean; disabled?: boolean; onChange: (v: boolean) => void; label: string }) => (
+    <label className={`flex items-center gap-3 ${disabled ? "opacity-50" : ""}`}>
+      <input type="checkbox" className="h-4 w-4" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      <span className="text-sm">{label}</span>
+    </label>
+  );
+
+  return (
+    <div>
+      <label className="label">{t("settings.windows")}</label>
+      <div className="space-y-3">
+        <Check
+          checked={autostart}
+          label={t("settings.autostart")}
+          onChange={async (v) => {
+            setAutostart(v);
+            await desktop.setAutostart(v).catch((e) => (console.error(e), setAutostart(!v)));
+          }}
+        />
+        <div className="pl-7">
+          <Check checked={prefs.startMinimized} disabled={!autostart} label={t("settings.startMinimized")} onChange={(v) => savePrefs({ startMinimized: v })} />
+        </div>
+        <Check checked={prefs.closeToTray} label={t("settings.closeToTray")} onChange={(v) => savePrefs({ closeToTray: v })} />
+        <p className="pl-7 text-xs text-muted-foreground">{t("settings.closeToTrayHint")}</p>
+      </div>
+    </div>
+  );
+}
+
+function UpdateSection() {
+  const t = useT();
+  const update = useUpdate();
+  const [version, setVersion] = useState("");
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => {});
+  }, []);
+
+  const status =
+    update.state === "checking"
+      ? t("update.checking")
+      : update.state === "none"
+        ? t("update.none")
+        : update.state === "available"
+          ? t("update.available", { v: update.version ?? "" })
+          : update.state === "downloading"
+            ? t("update.downloading", { p: Math.round((update.progress ?? 0) * 100) })
+            : update.state === "error"
+              ? t("update.error", { e: update.error ?? "" })
+              : "";
+
+  return (
+    <div>
+      <label className="label">{t("update.title")}</label>
+      <div className="flex items-center gap-3 rounded-lg border border-border p-4">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">{t("update.version", { v: version })}</div>
+          {status && <div className={`text-xs ${update.state === "error" ? "text-destructive" : "text-muted-foreground"}`}>{status}</div>}
+        </div>
+        {update.state === "available" ? (
+          <button className="btn-primary shrink-0" onClick={() => installUpdate()}>
+            <Download size={14} /> {t("update.install")}
+          </button>
+        ) : (
+          <button
+            className="btn-outline shrink-0"
+            disabled={update.state === "checking" || update.state === "downloading"}
+            onClick={() => checkForUpdate()}
+          >
+            <RefreshCw size={14} className={update.state === "checking" ? "animate-spin" : ""} /> {t("update.check")}
+          </button>
+        )}
       </div>
     </div>
   );

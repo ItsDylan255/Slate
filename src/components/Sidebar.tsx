@@ -3,11 +3,13 @@ import { DndContext, DragOverlay, PointerSensor, closestCenter, useSensor, useSe
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { Archive, ChevronRight, CircleCheck, House, Layout, MoreHorizontal, PanelLeft, Plus, Search, Settings } from "lucide-react";
+import { Archive, ChevronRight, CircleCheck, House, Layout, MoreHorizontal, PanelLeft, Plus, Search, Settings, ArrowDownCircle } from "lucide-react";
 import { isDone, useStore } from "../store";
 import type { Project } from "../lib/types";
 import { useT } from "../i18n";
 import { SlateLogo } from "./SlateLogo";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { installUpdate, useUpdate } from "../lib/updater";
 
 /** Knopf zum Ein-/Ausklappen der Seitenleiste (Strg+B), wie Kaneos Sidebar-Trigger. */
 export function SidebarTrigger() {
@@ -29,6 +31,7 @@ export function Sidebar() {
   const openCount = useStore((s) => s.data.tasks.filter((x) => !x.archived && !isDone(x, s.data.columns)).length);
   const { go, set, reorderProjects } = useStore.getState();
   const [projectsOpen, setProjectsOpen] = useState(true);
+  const update = useUpdate();
   const [dragging, setDragging] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -133,6 +136,20 @@ export function Sidebar() {
       </div>
 
       <div className="p-2">
+        {(update.state === "available" || update.state === "downloading") && (
+          <NavItem
+            active={false}
+            icon={<ArrowDownCircle className="text-info" />}
+            label={
+              update.state === "downloading"
+                ? t("update.downloading", { p: Math.round((update.progress ?? 0) * 100) })
+                : t("update.sidebar", { v: update.version ?? "" })
+            }
+            onClick={async () => {
+              if (update.state === "available" && (await ask(t("update.confirm", { v: update.version ?? "" })))) installUpdate();
+            }}
+          />
+        )}
         <NavItem active={false} icon={<Settings />} label={t("nav.settings")} onClick={() => set({ settingsOpen: true })} />
       </div>
     </aside>
